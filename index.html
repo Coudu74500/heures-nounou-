@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Heures Nounou</title>
+<style>
+*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#f4f4f6;color:#111;padding:18px 14px 40px}
+main{max-width:650px;margin:auto}h1{font-size:28px;margin:8px 0 4px}.sub{color:#6b6b70;margin-bottom:18px}.card{background:white;border-radius:18px;padding:16px;margin:12px 0}
+label{display:block;font-size:13px;color:#666;margin-bottom:12px}input{display:block;width:100%;font:inherit;font-size:20px;color:#111;background:#fff;border:1px solid #d7d7dc;border-radius:12px;padding:12px;margin-top:5px;min-height:50px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.total{font-size:36px;font-weight:750;margin:4px 0}.small{font-size:13px;color:#777}
+button{width:100%;border:0;border-radius:13px;min-height:50px;font-size:17px;font-weight:650;padding:12px;margin-top:8px;background:#111;color:#fff}.secondary{background:#e9e9ed;color:#111}.success{margin-top:10px;padding:10px;border-radius:10px;background:#eef5ee;display:none}.row{padding:12px 0;border-bottom:1px solid #eee;display:flex;justify-content:space-between;gap:10px;align-items:center}.row:last-child{border:0}.row button{width:auto;min-height:38px;margin:0;padding:7px 10px;font-size:14px}.monthsum{display:flex;justify-content:space-between;align-items:end;gap:10px}.warn{font-size:13px;color:#777;margin-top:10px}
+@media(max-width:420px){.grid{grid-template-columns:1fr}.total{font-size:32px}}
+</style>
+</head>
+<body><main>
+<h1>Heures Nounou</h1><div class="sub">Calcul et suivi mensuel</div>
+
+<section class="card">
+<label>Date<input id="date" type="date"></label>
+<div class="grid">
+<label>Heure d'arrivée<input id="start" type="time" step="60"></label>
+<label>Heure de départ<input id="end" type="time" step="60"></label>
+</div>
+<label>Pause en minutes<input id="pause" type="number" min="0" max="600" step="1" value="0" inputmode="numeric"></label>
+<div class="small">Temps travaillé</div><div class="total" id="dayTotal">0 h 00</div>
+<button type="button" id="save">Enregistrer la journée</button>
+<div id="success" class="success">Journée enregistrée ✓</div>
+<div id="msg" class="warn"></div>
+</section>
+
+<section class="card">
+<label>Mois affiché<input id="month" type="month"></label>
+<div class="monthsum"><div><div class="small">Total du mois</div><div class="total" id="monthTotal">0 h 00</div></div><div id="count" class="small">0 journée</div></div>
+<div id="list"></div>
+</section>
+
+<section class="card">
+<label>Taux horaire net (€)<input id="rate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Optionnel"></label>
+<div class="small">Montant estimé</div><div class="total" id="pay">—</div>
+<button type="button" class="secondary" id="export">Exporter le mois en CSV</button>
+<button type="button" class="secondary" id="clear">Effacer le mois</button>
+</section>
+
+<script>
+(function(){
+"use strict";
+var dateEl=document.getElementById("date"), startEl=document.getElementById("start"), endEl=document.getElementById("end"), pauseEl=document.getElementById("pause"), monthEl=document.getElementById("month");
+var dayTotal=document.getElementById("dayTotal"), monthTotal=document.getElementById("monthTotal"), list=document.getElementById("list"), count=document.getElementById("count"), rate=document.getElementById("rate"), pay=document.getElementById("pay"), msg=document.getElementById("msg"), success=document.getElementById("success");
+var KEY="heuresNounouData2", RATEKEY="heuresNounouRate2", data={};
+try{data=JSON.parse(localStorage.getItem(KEY)||"{}")||{};rate.value=localStorage.getItem(RATEKEY)||""}catch(e){data={};msg.textContent="Le stockage permanent n'est pas disponible dans ce mode. Le calcul fonctionne, mais ouvre idéalement cette page dans Safari."}
+function pad(n){return n<10?"0"+n:""+n}
+function today(){var d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+dateEl.value=today();monthEl.value=today().slice(0,7);
+function toMin(v){if(!v||v.indexOf(":")<0)return null;var a=v.split(":");return parseInt(a[0],10)*60+parseInt(a[1],10)}
+function workMinutes(){var a=toMin(startEl.value),b=toMin(endEl.value),p=parseInt(pauseEl.value||"0",10);if(a===null||b===null)return 0;if(b<a)b+=1440;return Math.max(0,b-a-(isNaN(p)?0:p))}
+function fmt(n){n=Math.round(n||0);return Math.floor(n/60)+" h "+pad(n%60)}
+function updateDay(){dayTotal.textContent=fmt(workMinutes());msg.textContent=""}
+function saveStorage(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch(e){return false}}
+function loadDay(){var x=data[dateEl.value];startEl.value=x?x.start:"";endEl.value=x?x.end:"";pauseEl.value=x?x.pause:0;updateDay()}
+function render(){
+ var m=monthEl.value, keys=Object.keys(data).filter(function(k){return k.slice(0,7)===m}).sort(), sum=0;
+ keys.forEach(function(k){sum+=data[k].minutes||0});
+ monthTotal.textContent=fmt(sum);count.textContent=keys.length+" journée"+(keys.length>1?"s":"");
+ var r=parseFloat(String(rate.value).replace(",","."));pay.textContent=r>0?(sum/60*r).toFixed(2).replace(".",",")+" €":"—";
+ if(!keys.length){list.innerHTML='<div class="small" style="padding-top:12px">Aucune journée enregistrée.</div>';return}
+ list.innerHTML="";
+ keys.forEach(function(k){
+  var x=data[k], row=document.createElement("div");row.className="row";
+  var left=document.createElement("div");var dt=new Date(k+"T12:00:00");
+  left.innerHTML="<strong>"+dt.toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"2-digit"})+"</strong><div class='small'>"+x.start+" → "+x.end+(x.pause?" · pause "+x.pause+" min":"")+"</div>";
+  var right=document.createElement("div");right.style.textAlign="right";right.innerHTML="<strong>"+fmt(x.minutes)+"</strong><br>";
+  var edit=document.createElement("button");edit.type="button";edit.className="secondary";edit.textContent="Modifier";edit.addEventListener("click",function(){dateEl.value=k;loadDay();window.scrollTo(0,0)});
+  right.appendChild(edit);row.appendChild(left);row.appendChild(right);list.appendChild(row);
+ });
+}
+["input","change"].forEach(function(ev){startEl.addEventListener(ev,updateDay);endEl.addEventListener(ev,updateDay);pauseEl.addEventListener(ev,updateDay)});
+dateEl.addEventListener("change",loadDay);monthEl.addEventListener("change",render);
+rate.addEventListener("input",function(){try{localStorage.setItem(RATEKEY,rate.value)}catch(e){}render()});
+document.getElementById("save").addEventListener("click",function(){
+ success.style.display="none";var d=dateEl.value;
+ if(!d||!startEl.value||!endEl.value){msg.textContent="Renseigne la date, l'heure d'arrivée et l'heure de départ.";return}
+ var mins=workMinutes();data[d]={start:startEl.value,end:endEl.value,pause:parseInt(pauseEl.value||"0",10)||0,minutes:mins};
+ var ok=saveStorage();monthEl.value=d.slice(0,7);render();success.style.display="block";msg.textContent=ok?"":"Journée ajoutée pour cette session, mais le navigateur bloque le stockage permanent dans ce mode.";
+ setTimeout(function(){success.style.display="none"},1800);
+});
+document.getElementById("clear").addEventListener("click",function(){var m=monthEl.value;if(!confirm("Effacer toutes les journées de ce mois ?"))return;Object.keys(data).forEach(function(k){if(k.slice(0,7)===m)delete data[k]});saveStorage();render();loadDay()});
+document.getElementById("export").addEventListener("click",function(){
+ var m=monthEl.value, rows=[["Date","Arrivée","Départ","Pause min","Temps heures"]];Object.keys(data).filter(function(k){return k.slice(0,7)===m}).sort().forEach(function(k){var x=data[k];rows.push([k,x.start,x.end,x.pause,(x.minutes/60).toFixed(2).replace(".",",")])});
+ var csv="\ufeff"+rows.map(function(r){return r.join(";")}).join("\r\n");
+ try{var blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="heures-nounou-"+m+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000)}catch(e){msg.textContent="Export indisponible dans ce mode d'ouverture."}
+});
+updateDay();render();
+})();
+</script>
+</main></body></html>
