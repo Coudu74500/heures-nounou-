@@ -94,7 +94,7 @@ document.getElementById("export").addEventListener("click",function(){
  function pdfText(s){return "("+String(s).replace(/[\\()]/g,"\\$&").replace(/[^\x20-\x7e]/g,function(c){var map={"€":128,"œ":156,"Œ":140,"’":146,"–":150,"—":151,"…":133," ":160};var code=map[c]||c.charCodeAt(0);return code<=255?"\\"+code.toString(8).padStart(3,"0"):"?"})+")"}
  function line(s,x,size,bold){lines.push("BT /"+(bold?"F2":"F1")+" "+size+" Tf "+x+" "+y+" Td "+pdfText(s)+" Tj ET")}
  function rule(){lines.push("45 "+(y-10)+" m 550 "+(y-10)+" l S")}
- line("Heures Nounou — "+monthName,45,18,true);y-=32;
+ line("Heures Régine — "+monthName,45,18,true);y-=32;
  line("Date",45,10,true);line("Arrivée",135,10,true);line("Départ",215,10,true);line("Pause",295,10,true);line("Durée",385,10,true);rule();y-=25;
  keys.forEach(function(k){var x=data[k];line(new Date(k+"T12:00:00").toLocaleDateString("fr-FR"),45,10);line(x.start||"",135,10);line(x.end||"",215,10);line((x.pause||0)+" min",295,10);line(fmt(x.minutes),385,10);y-=19});
  if(!keys.length){line("Aucune journée enregistrée.",45,10);y-=22}
